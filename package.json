@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@langchain/community": "^0.3.47",
     "@langchain/core": "^0.3.61",
     "@langchain/langgraph": "^0.3.5",
     "@langchain/ollama": "^0.2.3",
@@ -30,7 +31,8 @@
     "@qdrant/js-client-rest": "^1.14.1",
     "langchain": "^0.3.29",
     "multer": "^2.0.1",
-    "openai": "^5.8.2",
+    "ollama": "^0.5.16",
+    "openai": "^4.62.1",
     "pdf-extract": "^1.0.11",
     "pdf-parse": "^1.1.1",
     "pdf2pic": "^3.2.0",

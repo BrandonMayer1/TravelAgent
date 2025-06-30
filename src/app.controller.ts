@@ -1,5 +1,14 @@
-import { Controller, Get, Post, Body, Res, UseInterceptors, UploadedFile, Req } from '@nestjs/common';
-import { Response,Request } from 'express';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Res,
+  UseInterceptors,
+  UploadedFile,
+  Req,
+} from '@nestjs/common';
+import { Response, Request } from 'express';
 import { AppService } from './app.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Express } from 'express';
@@ -7,21 +16,24 @@ import { FileUploadService } from './file-upload.service';
 
 @Controller()
 export class AppController {
-  constructor(private readonly appService: AppService, private readonly fileUploadService: FileUploadService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly fileUploadService: FileUploadService,
+  ) {}
   private UserChats: string[] = [];
   private AiChats: string[] = [];
 
-
   @Get()
   Homepage() {
-    let chatHistory = '<div class="bubble ai">AI: Hello I am an AI agent here to help you book flights. Where from and to do you want to go?</div>';
+    let chatHistory =
+      '<div class="bubble ai">AI: Hello I am an AI agent here to help you book flights. Where from and to do you want to go?</div>';
     for (let i = 0; i < this.UserChats.length; i++) {
       chatHistory += `<div class="bubble user">You: ${this.UserChats[i]}</div>`;
       if (this.AiChats[i] != null) {
         chatHistory += `<div class="bubble ai">AI: ${this.AiChats[i]}</div>`;
       }
     }
-  
+
     return `
       <!DOCTYPE html>
       <html>
@@ -121,42 +133,49 @@ export class AppController {
 
   @Post('submit')
   async handleSubmit(@Body() body) {
-      console.log('Received message:', body.message);
-      
-      const userMessage = body.message
-      this.UserChats.push(userMessage);
-      //Starts Chat with Agent
-      const agentState = await this.appService.startChat(userMessage)
-      console.log('Agent state:', agentState);
-      let aiResponse = '';
-      //If throws error it prints that
-      if (agentState.error) {
-        aiResponse = agentState.error;
+  
+    const userMessage = body.message;
+    this.UserChats.push(userMessage);
+  
+    // Build chat history for LangChain (if needed by prompt)
+    let chatHistory: { role: 'user' | 'assistant'; content: string }[] = [];
+    for (let i = 0; i < this.UserChats.length; i++) {
+      chatHistory.push({ role: 'user', content: this.UserChats[i] });
+      if (this.AiChats[i]) {
+        chatHistory.push({ role: 'assistant', content: this.AiChats[i] });
       }
-      //If found flights then prints that
-      if (agentState.foundFlights){
-        aiResponse = agentState.foundFlights;
-      }
-      return { aiResponse: aiResponse };
+    }
+    console.log('User message:', userMessage);
+  
+    // Call your agent with input + chat history
+    const result = await this.appService.startChat(userMessage, chatHistory);
+    console.log('AI result:', result);
+  
+    // Store new AI message
+    this.AiChats.push(result);
+  
+    return { aiResponse: result };
   }
 
-
-  
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file', {
-    dest: './uploads/',
-    limits: {
-      fileSize: 1024 * 1024 * 5 // 5MB limit
-    }
-  }))
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Req() req: Request, @Res() res: Response) {
+  @UseInterceptors(
+    FileInterceptor('file', {
+      dest: './uploads/',
+      limits: {
+        fileSize: 1024 * 1024 * 5, // 5MB limit
+      },
+    }),
+  )
+  async uploadFile(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     if (!file) {
       return res.status(400).send('No file uploaded');
     }
-    
+
     await this.fileUploadService.handleFileUpload(file);
     res.redirect('/');
   }
-
-
 }

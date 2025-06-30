@@ -3,11 +3,13 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HttpModule } from '@nestjs/axios';
 import { FileUploadService } from './file-upload.service';
-import { FlightAgentModule } from './flight-agent/flight-agent.module';
+import { OllamaService } from './ollama/ollama.service';
+import { AgentModule } from './agent/agent.module';
+import { OllamaModule } from './ollama/ollama.module';
 
 @Module({
-  imports: [HttpModule, FlightAgentModule],
+  imports: [HttpModule, AgentModule, OllamaModule],
   controllers: [AppController],
-  providers: [AppService, FileUploadService],
+  providers: [AppService, FileUploadService, OllamaService],
 })
 export class AppModule {}
