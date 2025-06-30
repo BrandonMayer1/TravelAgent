@@ -14,7 +14,7 @@ export class AppController {
 
   @Get()
   Homepage() {
-    let chatHistory = '';
+    let chatHistory = '<div class="bubble ai">AI: Hello I am an AI agent here to help you book flights. Where from and to do you want to go?</div>';
     for (let i = 0; i < this.UserChats.length; i++) {
       chatHistory += `<div class="bubble user">You: ${this.UserChats[i]}</div>`;
       if (this.AiChats[i] != null) {
@@ -52,6 +52,8 @@ export class AppController {
               border-radius: 15px;
               max-width: 80%;
               word-wrap: break-word;
+              white-space: pre-wrap;
+              font-family: inherit;
             }
 
             .user {
@@ -85,10 +87,10 @@ export class AppController {
               const inputElement = document.getElementById('messageInput');
               const message = inputElement.value;
               const chatBox = document.getElementById('chatBox');
-  
+              
               chatBox.innerHTML += '<div class="bubble user">You: ' + message + '</div>';
               inputElement.value = '';
-  
+
               try {
                 const response = await fetch('/submit', {
                   method: 'POST',
@@ -97,9 +99,16 @@ export class AppController {
                   },
                   body: JSON.stringify({ message: message })
                 });
-  
+
                 const data = await response.json();
-                chatBox.innerHTML += '<div class="bubble ai">AI: ' + data.aiResponse + '</div>';
+                // Escape HTML and preserve formatting
+                const formattedResponse = data.aiResponse
+                  .replace(/&/g, '&amp;')
+                  .replace(/</g, '&lt;')
+                  .replace(/>/g, '&gt;')
+                  .replace(/"/g, '&quot;')
+                  .replace(/'/g, '&#039;');
+                chatBox.innerHTML += '<div class="bubble ai">AI: ' + formattedResponse + '</div>';
               } catch (error) {
                 chatBox.innerHTML += '<div class="bubble ai">Error getting response</div>';
               }
@@ -112,12 +121,23 @@ export class AppController {
 
   @Post('submit')
   async handleSubmit(@Body() body) {
+      console.log('Received message:', body.message);
+      
       const userMessage = body.message
       this.UserChats.push(userMessage);
-      const AiResponse = await this.appService.startChat(userMessage)
-      this.AiChats.push(AiResponse);
-
-      return { aiResponse: AiResponse };
+      //Starts Chat with Agent
+      const agentState = await this.appService.startChat(userMessage)
+      console.log('Agent state:', agentState);
+      let aiResponse = '';
+      //If throws error it prints that
+      if (agentState.error) {
+        aiResponse = agentState.error;
+      }
+      //If found flights then prints that
+      if (agentState.foundFlights){
+        aiResponse = agentState.foundFlights;
+      }
+      return { aiResponse: aiResponse };
   }
 
 

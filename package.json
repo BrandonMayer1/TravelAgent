@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langchain/core": "^0.3.61",
+    "@langchain/langgraph": "^0.3.5",
     "@langchain/ollama": "^0.2.3",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^11.0.1",
@@ -29,6 +30,7 @@
     "@qdrant/js-client-rest": "^1.14.1",
     "langchain": "^0.3.29",
     "multer": "^2.0.1",
+    "openai": "^5.8.2",
     "pdf-extract": "^1.0.11",
     "pdf-parse": "^1.1.1",
     "pdf2pic": "^3.2.0",

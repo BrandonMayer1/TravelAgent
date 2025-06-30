@@ -54,16 +54,16 @@ export class FileUploadService {
 
   async storeInQdrant(embedding: number[], text: string) {
     const collections = await this.qdrant.getCollections();
-    const exists = collections.collections.some(c => c.name === 'pdf-storage');
+    const exists = collections.collections.some(c => c.name === 'flight-storage');
     if (!exists){
-        await this.qdrant.createCollection('pdf-storage', {
+        await this.qdrant.createCollection('flight-storage', {
             vectors: {
             size: 1024, 
             distance: 'Cosine',
             },
         });
     }
-    await this.qdrant.upsert('pdf-storage', {
+    await this.qdrant.upsert('flight-storage', {
         points: [{
             id: Date.now(), 
             vector: embedding,
@@ -80,35 +80,12 @@ export class FileUploadService {
     //message -> vector
     const vectorMessage = await this.toVector(message);
     //query VectorDB
-    const result = await this.qdrant.search('pdf-storage', {
+    const result = await this.qdrant.search('flight-storage', {
         vector: vectorMessage,
-        limit: 5, 
+        limit: 10, 
         with_payload: true,
     });
     return result.map(hit => hit.payload?.text).filter(Boolean).join('\n\n');
   }
 }
 
-
-
-
-
-
-    /** 
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post('http://localhost:11434/api/embed', payload, {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-      );
-
-      return response.data.embeddings?.[0]; //Check
-    }
-    catch (error){
-      console.log("ERROR: " + error.message);
-      throw error;
-    }
-  } */

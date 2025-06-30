@@ -3,9 +3,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { HttpModule } from '@nestjs/axios';
 import { FileUploadService } from './file-upload.service';
+import { FlightAgentModule } from './flight-agent/flight-agent.module';
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule, FlightAgentModule],
   controllers: [AppController],
   providers: [AppService, FileUploadService],
 })
