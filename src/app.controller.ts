@@ -137,24 +137,13 @@ export class AppController {
     const userMessage = body.message;
     this.UserChats.push(userMessage);
   
-    // Build chat history for LangChain (if needed by prompt)
-    let chatHistory: { role: 'user' | 'assistant'; content: string }[] = [];
-    for (let i = 0; i < this.UserChats.length; i++) {
-      chatHistory.push({ role: 'user', content: this.UserChats[i] });
-      if (this.AiChats[i]) {
-        chatHistory.push({ role: 'assistant', content: this.AiChats[i] });
-      }
-    }
+
     console.log('User message:', userMessage);
   
     // Call your agent with input + chat history
-    const result = await this.appService.startChat(userMessage, chatHistory);
-    console.log('AI result:', result);
-  
-    // Store new AI message
-    this.AiChats.push(result);
-  
-    return { aiResponse: result };
+    const result = await this.appService.startChat(userMessage);
+    console.log('AI result:', result.response);  
+    return { aiResponse: result.response };
   }
 
   @Post('upload')
