@@ -1,68 +1,80 @@
 import { Injectable } from '@nestjs/common';
-import { Tool } from '@langchain/core/tools';
+import { StructuredTool } from '@langchain/core/tools';
 import { Ollama } from '@langchain/community/llms/ollama';
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 @Injectable()
-export class FlightExtractorTool extends Tool {
+export class FlightExtractorTool extends StructuredTool {
+  private inputSchema = z.string().describe("Raw user flight request (e.g., 'flight from Philly to NYC July 5th')");
+
+  private outputType = z.string().describe(
+    "Standardized natural language flight request with airport codes. " +
+    "Format: 'Flight from [City] (CODE) to [City] (CODE) [date] [budget]'. " +
+    "Example: 'Flight from Philadelphia (PHL) to New York (JFK) on 2025-07-05 with $500 USD budget'"
+  );
+
   name = 'flight-extractor';
-  description = 'Extracts flight parameters from user requests including departure/arrival cities, airport codes, and budget information. Returns structured JSON data.';
+  description = 'Converts informal flight requests into standardized natural language format with airport codes for the flight finder tool';
   
+  schema = zodToJsonSchema(
+    z.object({
+      parameters: this.inputSchema,
+      response: this.outputType
+    })
+  );
+
   private llm = new Ollama({ model: 'llama3.1:latest' });
 
-  async _call(userQuery: string): Promise<string> {
-    console.log("Extracting Flight Parameters from Request");
-    const prompt = `Extract flight details and respond with VALID JSON. Follow these rules:
-      1. RESPONSE FORMAT (must use this exact structure):
-      {
-        "departure": {"city": "CityName", "code": "AIRPORT"},
-        "arrival": {"city": "CityName", "code": "AIRPORT"}, 
-        "budget": {"amount": number, "currency": "USD"} || null
-      }
+  async _call(input: { parameters: string }): Promise<string> {
+    const currentDate = new Date().toISOString().split('T')[0];
+    console.log(input);
+    const prompt = `Transform this flight request into a standardized natural language summary:
 
-            2. Airport Codes (use these exact codes):
-            - New York → JFK
-            - Los Angeles → LAX  
-            - Chicago → ORD
-            - Philadelphia → PHL
-            - Miami → MIA
-            - Boston → BOS
-            - San Francisco → SFO
-            - Dallas → DFW
+    USER REQUEST: "${input.parameters}"
+    CURRENT DATE: ${currentDate}
 
-            3. Budgets:
-            - Always return amount as number (500 not $500)
-            - Always use USD as currency
-            - If no budget specified, return null
+    FORMATTING RULES:
+    1. Always include:
+       - Departure city with airport code (e.g., "Philadelphia (PHL)")
+       - Arrival city with airport code
+    2. Optional elements if mentioned:
+       - Date (format as YYYY-MM-DD)
+       - Budget (format as "$XXX USD")
+       - Travel class (economy/business/first)
+    3. Never include:
+       - Additional commentary
+       - Questions
+       - Suggestions
+       -Only respond with what the user responds no aditional comments OR YOU WILL DIE
 
-            Examples:
-            Input: "Fly from Boston to Chicago with $500 budget"
-            Output: 
-            {
-            "departure": {"city": "Boston", "code": "BOS"},
-            "arrival": {"city": "Chicago", "code": "ORD"},
-            "budget": {"amount": 500, "currency": "USD"}
-            }
+    CITY TO AIRPORT CODE MAPPING:
+    - New York → JFK
+    - Philadelphia → PHL
+    - Miami → MIA
+    - Chicago → ORD
+    - Los Angeles → LAX
 
-            Input: "philly to nyc"
-            Output:
-            {
-            "departure": {"city": "Philadelphia", "code": "PHL"},
-            "arrival": {"city": "New York", "code": "JFK"}, 
-            "budget": null
-            }
+    DATE HANDLING:
+    - "next Tuesday" → calculate actual date
+    - "July 20th" → 2025-07-20
+    - "tomorrow" → calculate actual date
 
-            Input: "flights to miami under 300 dollars"  
-            Output:
-            {
-            "departure": null,
-            "arrival": {"city": "Miami", "code": "MIA"},
-            "budget": {"amount": 300, "currency": "USD"}
-            }
+    EXAMPLES:
+    Input: "I need to fly from Philly to NYC"
+    Output: "Flight from Philadelphia (PHL) to New York (JFK)"
 
-            Input: "${userQuery}"
-            Output:`;
+    Input: "Book me a flight to Miami with $500 budget for July 15th"
+    Output: "Flight to Miami (MIA) with $500 USD budget on 2025-07-15"
+
+    Input: "Flights from Boston to Chicago business class next Friday"
+    Output: "Flight from Boston (BOS) to Chicago (ORD) in business class on 2025-07-19"
+
+    Input: "${input.parameters}"
+    Output:`;
 
     const response = await this.llm.invoke(prompt);
+    console.log("__________________________FLIGHT EXTRACTOR___________________________")
     console.log(response);
     return response;
   }

@@ -4,9 +4,8 @@ import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { FlightFinderTool } from './tools/flight-finder';
 import { FlightExtractorTool } from './tools/flight-extracter';
 import { ConfigService } from '@nestjs/config';
-import { OllamaService } from 'src/ollama/ollama.service';
 import { FlightBookingTool } from './tools/flight-book';
-
+import {FlightValidatorTool} from './tools/flight-validator';
 @Injectable()
 export class FlightAgentService {
   private agent: any;
@@ -18,6 +17,7 @@ export class FlightAgentService {
     private readonly flightExtractorTool: FlightExtractorTool,
     private readonly flightFinderTool: FlightFinderTool,
     private readonly flightBookingTool: FlightBookingTool,
+    private readonly flightValidatorTool: FlightValidatorTool,
 
   ) {
     this.model = new ChatGoogleGenerativeAI({
@@ -32,13 +32,14 @@ export class FlightAgentService {
   private async initializeAgent() {
     this.agent = createReactAgent({
       llm: this.model,
-      tools: [this.flightExtractorTool, this.flightFinderTool, this.flightBookingTool],
-      prompt: `You are a flight booking assistant. When showing flight results:
+      tools: [this.flightExtractorTool, this.flightFinderTool, this.flightBookingTool, this.flightValidatorTool],
+      prompt: `You are a flight booking assistant. Today is ${Date()} When showing flight results:
       1. ALWAYS display specific flights in a numbered list
-      2. Include airline, flight number, times, and price
-      3. Never summarize or say "range from X to Y"
-      4. Make it human readable
-      5. Do not book a flight unless the user Explicity asks to book`
+      2. Make it human readable
+      3. Do not book a flight unless the user Explicity asks to book
+      4. You do not need to fill in all information when using tools.
+      5. AFTER YOU USE FLIGHT FINDER YOU MUST USE FLIGHT VALIDATOR TO CHECK ACCURACCY OF RESPONSE
+      `
     });
   }
 
@@ -52,9 +53,7 @@ export class FlightAgentService {
           content: query,
         }],
       });
-      console.log(result.messages);
       this.chatHistory = result.messages;
-
       //gets last message
       const lastMessage = result.messages[result.messages.length - 1].content;
       const finalResponse = Array.isArray(lastMessage) 

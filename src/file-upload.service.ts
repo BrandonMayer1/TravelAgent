@@ -74,14 +74,14 @@ export class FileUploadService {
   }
 
   //Method that turns the message into a vector then querys vector db
-  async queryWithMessage(message: string) {
+  async queryWithMessage(message: string, resultAmount: number) {
     console.log('QUERYING WITH MESSAGE:', message);
     //message -> vector
     const vectorMessage = await this.toVector(message);
     //query VectorDB
     const result = await this.qdrant.search('flight-storage', {
       vector: vectorMessage,
-      limit: 10,
+      limit: resultAmount,
       with_payload: true,
     });
     return result
