@@ -142,8 +142,10 @@ export class AppController {
   
     // Call your agent with input + chat history
     const result = await this.appService.startChat(userMessage);
-    console.log('AI result:', result.response);  
-    return { aiResponse: result.response };
+    console.log('AI result:', result.response); 
+    const aiResponse = result.response ?? '';
+    this.AiChats.push(aiResponse);
+    return { aiResponse };
   }
 
   @Post('upload')
