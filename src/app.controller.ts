@@ -3,22 +3,14 @@ import {
   Get,
   Post,
   Body,
-  Res,
-  UseInterceptors,
-  UploadedFile,
-  Req,
 } from '@nestjs/common';
-import { Response, Request } from 'express';
+
 import { AppService } from './app.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { Express } from 'express';
-import { FileUploadService } from './file-upload.service';
 
 @Controller()
 export class AppController {
   constructor(
     private readonly appService: AppService,
-    private readonly fileUploadService: FileUploadService,
   ) {}
   private UserChats: string[] = [];
   private AiChats: string[] = [];
@@ -88,10 +80,6 @@ export class AppController {
             <input type="submit" value="Submit" />
           </form>
           <br />
-          <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" accept=".pdf" required />
-            <button type="submit">Upload File</button>
-          </form>
   
           <script>
             document.getElementById("chatForm").addEventListener('submit', async function(e) {
@@ -142,31 +130,9 @@ export class AppController {
   
     // Call your agent with input + chat history
     const result = await this.appService.startChat(userMessage);
-    console.log('AI result:', result.response); 
-    const aiResponse = result.response ?? '';
+    console.log('AI result:', result); 
+    const aiResponse = result ?? '';
     this.AiChats.push(aiResponse);
     return { aiResponse };
-  }
-
-  @Post('upload')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      dest: './uploads/',
-      limits: {
-        fileSize: 1024 * 1024 * 5, // 5MB limit
-      },
-    }),
-  )
-  async uploadFile(
-    @UploadedFile() file: Express.Multer.File,
-    @Req() req: Request,
-    @Res() res: Response,
-  ) {
-    if (!file) {
-      return res.status(400).send('No file uploaded');
-    }
-
-    await this.fileUploadService.handleFileUpload(file);
-    res.redirect('/');
   }
 }

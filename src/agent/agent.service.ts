@@ -1,70 +1,116 @@
 import { Injectable } from '@nestjs/common';
-import { createReactAgent } from "@langchain/langgraph/prebuilt";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { FlightFinderTool } from './tools/flight-finder';
-import { FlightExtractorTool } from './tools/flight-extracter';
-import { ConfigService } from '@nestjs/config';
-import { FlightBookingTool } from './tools/flight-book';
-import {FlightValidatorTool} from './tools/flight-validator';
+import { HttpService } from '@nestjs/axios';
+import { firstValueFrom } from 'rxjs';
+import {tools} from './tools';
+
 @Injectable()
 export class FlightAgentService {
-  private agent: any;
-  private readonly model: ChatGoogleGenerativeAI;
   private chatHistory: Array<{role: string, content: string}> = [];
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly flightExtractorTool: FlightExtractorTool,
-    private readonly flightFinderTool: FlightFinderTool,
-    private readonly flightBookingTool: FlightBookingTool,
-    private readonly flightValidatorTool: FlightValidatorTool,
+    private readonly httpService: HttpService,
+  ) {}
 
-  ) {
-    this.model = new ChatGoogleGenerativeAI({
-      model: "gemini-1.5-flash", 
-      apiKey: this.configService.get<string>('GOOGLE_API_KEY'),
-      maxOutputTokens: 2048,
-      temperature: 0.3
-    });
-    this.initializeAgent();
-  }
-
-  private async initializeAgent() {
-    this.agent = createReactAgent({
-      llm: this.model,
-      tools: [this.flightExtractorTool, this.flightFinderTool, this.flightBookingTool, this.flightValidatorTool],
-      prompt: `You are a flight booking assistant. Today is ${Date()} When showing flight results:
-      1. ALWAYS display specific flights in a numbered list
-      2. Make it human readable
-      3. Do not book a flight unless the user Explicity asks to book
-      4. You do not need to fill in all information when using tools.
-      5. AFTER YOU USE FLIGHT FINDER YOU MUST USE FLIGHT VALIDATOR TO CHECK ACCURACCY OF RESPONSE
-      `
-    });
-  }
 
   async invokeAgent(query: string) {
+    //ADD TOOLs
     try {
-      const result = await this.agent.invoke({
-        messages: [
-          ...this.chatHistory,
-          {
-          role: "user",
-          content: query,
-        }],
-      });
-      this.chatHistory = result.messages;
-      //gets last message
-      const lastMessage = result.messages[result.messages.length - 1].content;
-      const finalResponse = Array.isArray(lastMessage) 
-        ? lastMessage.join('\n') 
-        : lastMessage;
+      let topicMessage = [
+        ...this.chatHistory,
+        {
+          role: 'system',
+          content: `
+          You are a helpful, conversational flight travel agent assistant. You have access to the following tools:
+          
+          - filterFlights: Filters flights by departure/arrival IATA code, flight, airline, and limit (do not exceed 100).
+          TODAYS DATE ${new Date().toISOString().split('T')[0]}
+          When relevant, use a tool by returning a tool call with the correct function name and parameters.
+          -If a user enters a location use the nearest IATA code. 
+          Your answers should be helpful and engaging. If a user asks a question that requires a tool, call it with the correct format.`
+        },
+        {
+          role: 'user', 
+          content: `${query}`
+        }
+      ];
 
-      //return messages
-      return {
-        success: true,
-        response: finalResponse,
-      };
+      const toolSchema = tools.map(({ name, description, parameters }) => ({
+        type: "function",
+        function: { name, description, parameters }
+      }));
+
+      let payload: any = {
+        model: 'llama3.1',
+        messages: topicMessage,
+        stream: false,
+        tools: toolSchema
+      }
+
+      let response = await firstValueFrom(
+        this.httpService.post('http://localhost:11434/api/chat', payload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+      );
+      console.log("FULL tool_calls response:");
+      console.log(JSON.stringify(response.data.message.tool_calls, null, 2));
+      const toolMessages: any[] = [];
+
+      const toolCalls = response.data?.message?.tool_calls || [];
+      for (const toolCall of toolCalls) {
+        const { name, arguments: rawArgs } = toolCall.function;
+        const tool = tools.find(t => t.name === name);
+        if (!tool) continue;
+
+        const parsedParams = typeof rawArgs === 'string' ? JSON.parse(rawArgs) : rawArgs;
+        const toolResult = await tool.func(parsedParams);
+        toolMessages.push({
+          role:'system',
+          content: JSON.stringify(toolResult),
+          tool_call: tool.name,
+          
+        })
+      }
+        topicMessage = [
+        ...this.chatHistory,
+        {
+          role: 'system',
+          content: `You are a flight travel agent advisor please analyze the tool result and respond informationally and answer the users question.
+                    TODAYS DATE ${Date.now()}`,
+        },
+        ...toolCalls,
+        {
+          role: 'user', 
+          content: `${query}`
+        }
+      ];
+
+      const secondPayload = {
+        model: 'llama3.1',
+        messages: topicMessage,
+        stream: false,
+      }
+
+      response = await firstValueFrom(
+        this.httpService.post('http://localhost:11434/api/chat', secondPayload, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }),
+      );
+      this.chatHistory.push({
+          role: 'user', 
+          content: `${query}`
+      });
+      this.chatHistory.push({
+          role: 'assistant', 
+          content: `${response.data.message}`
+      });
+      
+      console.log(response.data.message);
+      return response.data.message.content;
+
     } catch (error) {
       console.error('Agent invocation error:', error);
       return {
@@ -74,4 +120,5 @@ export class FlightAgentService {
       };
     }
   }
+
 }
