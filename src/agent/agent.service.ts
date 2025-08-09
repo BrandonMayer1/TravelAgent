@@ -20,13 +20,20 @@ export class FlightAgentService {
         {
           role: 'system',
           content: `
-          You are a helpful, conversational flight travel agent assistant. You have access to the following tools:
-          
-          - filterFlights: Filters flights by departure/arrival IATA code, flight, airline, and limit (do not exceed 100).
-          TODAYS DATE ${new Date().toISOString().split('T')[0]}
-          When relevant, use a tool by returning a tool call with the correct function name and parameters.
-          -If a user enters a location use the nearest IATA code. 
-          Your answers should be helpful and engaging. If a user asks a question that requires a tool, call it with the correct format.`
+        You are a helpful, conversational and history aware flight travel agent assistant.
+        
+        TOOLS AVAILABLE:
+        - filterFlights: Filters flights by departure/arrival IATA code, flight, airline, and limit (do not exceed 20).
+        
+        TODAY'S DATE: ${new Date().toISOString().split('T')[0]}
+        
+        TOOL USAGE RULES:
+        - If the user asks for comparisons, filtering, or ranking of flights, call "filterFlights" again using the last known parameters unless they give new ones.
+        - Always resolve city names to nearest IATA code before calling the tool.
+        - Never make up flights — only use actual tool results.
+        - If tool results exist from earlier in the conversation and are still relevant, you may use them directly.
+  
+        `
         },
         {
           role: 'user', 
@@ -67,8 +74,7 @@ export class FlightAgentService {
         const toolResult = await tool.func(parsedParams);
         toolMessages.push({
           role:'system',
-          content: JSON.stringify(toolResult),
-          tool_call: tool.name,
+          content: `TOOL RESULT from "${tool.name}":\n${JSON.stringify(toolResult, null, 2)}`
           
         })
       }
@@ -76,10 +82,18 @@ export class FlightAgentService {
         ...this.chatHistory,
         {
           role: 'system',
-          content: `You are a flight travel agent advisor please analyze the tool result and respond informationally and answer the users question.
-                    TODAYS DATE ${Date.now()}`,
+          content: `
+        You are a flight travel agent advisor.
+        Analyze the TOOL RESULTS provided below and respond informatively to the user’s question.
+        Rules:
+        - Base your answer strictly on the provided flights data.
+        - Do not fabricate flight details or times.
+        - If the user asks for shortest/longest/cheapest, sort and return the relevant flights.
+        - Keep your answer clear, concise, and conversational.
+        - Please read the history to understand context of the user request.
+        `
         },
-        ...toolCalls,
+        ...toolMessages,
         {
           role: 'user', 
           content: `${query}`
@@ -87,7 +101,7 @@ export class FlightAgentService {
       ];
 
       const secondPayload = {
-        model: 'llama3.1',
+        model: 'deepseek-v2',
         messages: topicMessage,
         stream: false,
       }

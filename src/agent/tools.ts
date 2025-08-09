@@ -45,7 +45,6 @@ export const tools = [
             if (airlineName) url += `&airline_name=${encodeURIComponent(airlineName)}`;
             if (flightLimit) url += `&limit=${String(flightLimit)}`;
 
-            console.log('TEMP: Making flights API call to:', url);
             try{
                 const response = await lastValueFrom(httpService.get(url));
                 console.log('TEMP: Flights API response received, data count:', response.data.data?.length);
@@ -56,4 +55,6 @@ export const tools = [
             }
         }
     }
+
+    
 ];
