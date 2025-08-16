@@ -84,7 +84,7 @@ export class FlightAgentService {
           role: 'system',
           content: `
         You are a flight travel agent advisor.
-        Analyze the TOOL RESULTS provided below and respond informatively to the user’s question.
+        Analyze the TOOL RESULTS provided below and respond informatively to the user's question.
         Rules:
         - Base your answer strictly on the provided flights data.
         - Do not fabricate flight details or times.
